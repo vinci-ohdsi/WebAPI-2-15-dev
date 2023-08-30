@@ -3,6 +3,9 @@ package org.ohdsi.webapi.shiro;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.odysseusinc.logging.event.AddUserEvent;
 import com.odysseusinc.logging.event.DeleteRoleEvent;
+
+import io.buji.pac4j.subject.Pac4jPrincipal;
+
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.UnknownAccountException;
 import org.apache.shiro.subject.Subject;
@@ -20,14 +23,17 @@ import org.ohdsi.webapi.shiro.Entities.UserOrigin;
 import org.ohdsi.webapi.shiro.Entities.UserRepository;
 import org.ohdsi.webapi.shiro.Entities.UserRoleEntity;
 import org.ohdsi.webapi.shiro.Entities.UserRoleRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.Principal;
-import java.util.ArrayList;
+import java.util.AbstractMap;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -49,6 +55,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @Component
 @Transactional
 public class PermissionManager {
+  private final Logger logger = LoggerFactory.getLogger(PermissionManager.class);
 
   @Value("${datasource.ohdsi.schema}")
   private String ohdsiSchema;
@@ -76,12 +83,16 @@ public class PermissionManager {
   
   private ThreadLocal<ConcurrentHashMap<String, UserSimpleAuthorizationInfo>> authorizationInfoCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 
+  private Map<AbstractMap.SimpleEntry<String,String>, String> teamProjectRoles = new HashMap<>();
+
   public static class PermissionsDTO {
 
     public Map<String, List<String>> permissions = null;
   }
   
   public RoleEntity addRole(String roleName, boolean isSystem) {
+    logger.debug("Called addRole: {}", roleName);
+
     Guard.checkNotEmpty(roleName);
 
     checkRoleIsAbsent(roleName, isSystem, "Can't create role - it already exists");
@@ -119,8 +130,32 @@ public class PermissionManager {
     UserEntity user = this.getUserByLogin(login);
 
     UserRoleEntity userRole = this.userRoleRepository.findByUserAndRole(user, role);
-    if (userRole != null && (origin == null || origin.equals(userRole.getOrigin())))
+    if (userRole != null && (origin == null || origin.equals(userRole.getOrigin()))) {
+      logger.debug("Removing user from role: {}, {}, {}", user.getLogin(), role.getName(), userRole.getOrigin());
       this.userRoleRepository.delete(userRole);
+    }
+  }
+
+  public void removeUserFromUserRole(String roleName, String login) {
+    Guard.checkNotEmpty(roleName);
+    Guard.checkNotEmpty(login);
+
+    if (roleName.equalsIgnoreCase(login))
+      throw new RuntimeException("Can't remove user from personal role");
+
+    logger.debug("Checking if role exists: {}", roleName);
+    RoleEntity role = this.roleRepository.findByNameAndSystemRole(roleName, false);
+    if (role != null) {
+      UserEntity user = this.getUserByLogin(login);
+
+      UserRoleEntity userRole = this.userRoleRepository.findByUserAndRole(user, role);
+      if (userRole != null) {
+        logger.debug("Removing user from USER role: {}, {}", user.getLogin(), roleName);
+        this.userRoleRepository.delete(userRole);
+      }
+    } else {
+          logger.debug("Role {} not found", roleName);
+    }
   }
 
   public Iterable<RoleEntity> getRoles(boolean includePersonalRoles) {
@@ -178,13 +213,27 @@ public class PermissionManager {
   }
 
   @Transactional
+  public void updateUser(String login, Set<String> defaultRoles, Set<String> newUserRoles,
+      boolean resetRoles) {
+        registerUser(login, null, UserOrigin.SYSTEM, defaultRoles, newUserRoles, resetRoles);
+  }
+
+  @Transactional
   public UserEntity registerUser(final String login, final String name, final Set<String> defaultRoles) {
-    return registerUser(login, name, UserOrigin.SYSTEM, defaultRoles);
+    return registerUser(login, name, UserOrigin.SYSTEM, defaultRoles, null, false);
   }
 
   @Transactional
   public UserEntity registerUser(final String login, final String name, final UserOrigin userOrigin,
                                  final Set<String> defaultRoles) {
+    return registerUser(login, name, userOrigin, defaultRoles, null, false);
+  }
+  
+  @Transactional
+  private UserEntity registerUser(final String login, final String name, final UserOrigin userOrigin,
+                                 final Set<String> defaultRoles, final Set<String> newUserRoles, boolean resetRoles) {
+    logger.debug("Called registerUser with resetRoles: login={}, reset roles={}, default roles={}, new user roles={}",
+      login, resetRoles, defaultRoles, newUserRoles);
     Guard.checkNotEmpty(login);
     
     UserEntity user = userRepository.findByLogin(login);
@@ -198,7 +247,17 @@ public class PermissionManager {
         user.setOrigin(userOrigin);
         user = userRepository.save(user);
       }
-      return user;
+      if (resetRoles) {
+        // remove all user roles:
+        removeAllUserRolesFromUser(login, user, newUserRoles);
+        // add back just the given newUserRoles:
+        addRolesForUser(login, userOrigin, user, newUserRoles, false);
+        // make sure the default roles are there: TODO - discuss if really necessary....
+        addDefaultRolesForUser(login, userOrigin, user, defaultRoles);
+      }
+      // get user again, fresh from db with all new roles:
+      user = userRepository.findOne(user.getId());
+      return user;  // >>>>>>>>>> RETURN! Add else for readability???
     }
 
     checkRoleIsAbsent(login, false, "User with such login has been improperly removed from the database. " +
@@ -212,18 +271,49 @@ public class PermissionManager {
 
     RoleEntity personalRole = this.addRole(login, false);
     this.addUser(user, personalRole, userOrigin, null);
+    addRolesForUser(login, userOrigin, user, newUserRoles, false);
+    addDefaultRolesForUser(login, userOrigin, user, defaultRoles);
+    // get user again, fresh from db with all new roles:
+    user = userRepository.findOne(user.getId());
+    return user;
+  }
 
-    if (defaultRoles != null) {
-      for (String roleName: defaultRoles) {
-        RoleEntity defaultRole = this.getSystemRoleByName(roleName);
-        if (defaultRole != null) {
-          this.addUser(user, defaultRole, userOrigin, null);
+  private void addRolesForUser(String login, UserOrigin userOrigin, UserEntity user, Set<String> roles, boolean isSystemRole) {
+    if (roles != null) {
+      for (String roleName: roles) {
+        // Temporary patch/workaround (in reality the role should have been added by sysadmin?):
+        if (!isSystemRole) {
+          pocAddUserRole(roleName);
+        }
+        // end temporary patch
+        RoleEntity role = this.getRoleByName(roleName, isSystemRole);
+        if (role != null) {
+          this.addUser(user, role, userOrigin, null);
         }
       }
     }
+  }
 
-    user = userRepository.findOne(user.getId());
-    return user;
+  private void addDefaultRolesForUser(String login, UserOrigin userOrigin, UserEntity user, Set<String> roles) {
+    logger.debug("Adding the following system roles for the user: roles={}", roles);
+    addRolesForUser(login, userOrigin, user, roles,true);
+  }
+
+  private void removeAllUserRolesFromUser(String login, UserEntity user, final Set<String> rolesToSkip) {
+    Set<RoleEntity> userRoles = this.getUserRoles(user);
+    // remove all roles except the personal role and any role in the rolesToSkip:
+    userRoles.stream().filter(role -> !role.getName().equalsIgnoreCase(login) && !rolesToSkip.contains(role.getName())).forEach(role -> {
+        this.removeUserFromUserRole(role.getName(), login);
+    });
+  }
+
+  private RoleEntity pocAddUserRole(String roleName) {
+    RoleEntity role = this.roleRepository.findByNameAndSystemRole(roleName, false);
+    if (role != null) {
+      return role;
+    } else {
+      return addRole(roleName, false);
+    }
   }
 
   public Iterable<UserEntity> getUsers() {
@@ -402,6 +492,7 @@ public class PermissionManager {
 
   private Set<RoleEntity> getUserRoles(UserEntity user) {
     Set<UserRoleEntity> userRoles = user.getUserRoles();
+    logger.debug("Called getUserRoles. Found: {}", userRoles);
     Set<RoleEntity> roles = new LinkedHashSet<>();
     for (UserRoleEntity userRole : userRoles) {
       if (isRelationAllowed(userRole.getStatus())) {
@@ -438,17 +529,19 @@ public class PermissionManager {
   }
 
   private UserEntity getUserByLogin(final String login) {
+    logger.debug("Looking for user login={}...", login);
     final UserEntity user = this.userRepository.findByLogin(login);
-    if (user == null)
+    if (user == null) {
+      logger.error("User does NOT exist for login={}...", login);
       throw new RuntimeException("User doesn't exist");
-
+    }
     return user;
   }
 
   private RoleEntity getRoleByName(String roleName, Boolean isSystemRole) {
     final RoleEntity roleEntity = this.roleRepository.findByNameAndSystemRole(roleName, isSystemRole);
     if (roleEntity == null)
-      throw new RuntimeException("Role doesn't exist");
+      throw new RuntimeException("Role doesn't exist:" + roleName);
 
     return roleEntity;
   }
@@ -460,7 +553,7 @@ public class PermissionManager {
   private RoleEntity getRoleById(Long roleId) {
     final RoleEntity roleEntity = this.roleRepository.findById(roleId);
     if (roleEntity == null)
-      throw new RuntimeException("Role doesn't exist");
+      throw new RuntimeException("Role doesn't exist:" + roleId);
 
     return roleEntity;
   }
@@ -494,12 +587,15 @@ public class PermissionManager {
                                  final UserOrigin userOrigin, final String status) {
     UserRoleEntity relation = this.userRoleRepository.findByUserAndRole(user, role);
     if (relation == null) {
+      logger.debug("The role={} is new for this user. Adding...", role.getName());
       relation = new UserRoleEntity();
       relation.setUser(user);
       relation.setRole(role);
       relation.setStatus(status);
       relation.setOrigin(userOrigin);
       relation = this.userRoleRepository.save(relation);
+    } else {
+        logger.debug("The user already had the role={}", role.getName());
     }
 
     return relation;
@@ -509,11 +605,20 @@ public class PermissionManager {
     Subject subject = SecurityUtils.getSubject();
     Object principalObject = subject.getPrincipals().getPrimaryPrincipal();
 
-    if (principalObject instanceof String)
+    if (principalObject instanceof String) {
+      logger.debug("principal IS STRING: " + principalObject);
       return (String)principalObject;
+    }
+
+    if (principalObject instanceof Pac4jPrincipal) {
+      String login = ((Pac4jPrincipal)principalObject).getProfile().getEmail();
+      logger.debug("principal IS Pac4jPrincipal: " + login);
+      return login;
+    }
 
     if (principalObject instanceof Principal) {
       Principal principal = (Principal)principalObject;
+      logger.debug("principal IS Principal: " + principal.getName());
       return principal.getName();
     }
 
@@ -551,5 +656,31 @@ public class PermissionManager {
 
   public boolean roleExists(String roleName) {
     return this.roleRepository.existsByName(roleName);
+  }
+
+  private String getCurrentUserSessionId() {
+    Subject subject = SecurityUtils.getSubject();
+    return subject.getSession(false).getId().toString();
+  }
+
+  private AbstractMap.SimpleEntry<String,String> getCurrentUserAndSessionTuple() {
+    AbstractMap.SimpleEntry<String, String> userAndSessionTuple = new AbstractMap.SimpleEntry<>
+      (getCurrentUser().getLogin(), getCurrentUserSessionId());
+    return userAndSessionTuple;
+  }
+
+  public void setCurrentTeamProjectRoleForCurrentUser(String teamProjectRole, String login) {
+    logger.debug("Current user in setCurrentTeamProjectRoleForCurrentUser() {}", login);
+    this.teamProjectRoles.put(getCurrentUserAndSessionTuple(), teamProjectRole);
+  }
+
+  public RoleEntity getCurrentTeamProjectRoleForCurrentUser() {
+    logger.debug("Current user in getCurrentTeamProjectRoleForCurrentUser(): {}", getCurrentUser().getLogin());
+    String teamProjectRole = this.teamProjectRoles.get(getCurrentUserAndSessionTuple());
+    if (teamProjectRole == null) {
+      return null;
+    } else {
+      return this.getRoleByName(teamProjectRole, false);
+    }
   }
 }

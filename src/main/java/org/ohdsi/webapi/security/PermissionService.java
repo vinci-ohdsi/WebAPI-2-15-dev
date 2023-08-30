@@ -62,6 +62,9 @@ public class PermissionService {
     @Value("#{!'${security.provider}'.equals('DisabledSecurity')}")
     private boolean securityEnabled;
 
+    @Value("${security.ohdsi.custom.authorization.mode}")
+    private String authorizationMode;
+
     private final EntityGraph PERMISSION_ENTITY_GRAPH = EntityGraphUtils.fromAttributePaths("rolePermissions", "rolePermissions.role");
 
     public PermissionService(
@@ -189,7 +192,8 @@ public class PermissionService {
                 Subject subject = SecurityUtils.getSubject();
                 String login = this.permissionManager.getSubjectName();
                 UserSimpleAuthorizationInfo authorizationInfo = this.permissionManager.getAuthorizationInfo(login);
-                if (Objects.equals(authorizationInfo.getUserId(), entity.getCreatedBy().getId())) {
+                if (!this.authorizationMode.equals("teamproject") &&
+                Objects.equals(authorizationInfo.getUserId(), entity.getCreatedBy().getId())) {
                     hasAccess = true; // the role is the one that created the artifact
                 } else {
                     EntityType entityType = entityPermissionSchemaResolver.getEntityType(entity.getClass());
