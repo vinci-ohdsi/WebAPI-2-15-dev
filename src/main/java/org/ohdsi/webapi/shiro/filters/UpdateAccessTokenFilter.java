@@ -5,6 +5,8 @@ import static org.ohdsi.webapi.shiro.management.AtlasSecurity.PERMISSIONS_ATTRIB
 import static org.ohdsi.webapi.shiro.management.AtlasSecurity.TOKEN_ATTRIBUTE;
 
 import io.buji.pac4j.subject.Pac4jPrincipal;
+import org.json.JSONObject;
+
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.Principal;
@@ -36,6 +38,7 @@ import org.ohdsi.webapi.util.UserUtils;
 import org.pac4j.core.profile.CommonProfile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.client.RestTemplate;
 
 /**
  *
@@ -49,18 +52,21 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
   private final Set<String> defaultRoles;
   private final String onFailRedirectUrl;
   private final String authorizationMode;
+  private final String authorizationUrl;
 
   public UpdateAccessTokenFilter(
           PermissionManager authorizer,
           Set<String> defaultRoles,
           int tokenExpirationIntervalInSeconds,
           String onFailRedirectUrl,
-          String authorizationMode) {
+          String authorizationMode,
+          String authorizationUrl) {
     this.authorizer = authorizer;
     this.tokenExpirationIntervalInSeconds = tokenExpirationIntervalInSeconds;
     this.defaultRoles = defaultRoles;
     this.onFailRedirectUrl = onFailRedirectUrl;
     this.authorizationMode = authorizationMode;
+    this.authorizationUrl = authorizationUrl;
     logger.debug("AUTHORIZATION_MODE in UpdateAccessTokenFilter constructor == '{}'", this.authorizationMode);
   }
   
@@ -147,9 +153,13 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
           String teamProjectRole = extractTeamProjectFromRequestParameters(request);
           // if found, add teamproject as a role in the newUserRoles list:
           if (teamProjectRole != null) {
+            // double check if this role has really been granted to the user:
+            if (checkGen3Authorization(teamProjectRole, login) == false) {
+              WebUtils.toHttp(response).sendError(HttpServletResponse.SC_FORBIDDEN,
+               "User is not authorized to access this team project's data");
+              return false;
+            }
             newUserRoles.add(teamProjectRole);
-            // double check with Arborist if this role has really been granted to the user....
-            // TODO
           }
         }
         this.authorizer.registerUser(login, name, defaultRoles, newUserRoles, resetRoles);
@@ -175,6 +185,26 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
     Collection<String> permissions = this.authorizer.getAuthorizationInfo(login).getStringPermissions();
     request.setAttribute(PERMISSIONS_ATTRIBUTE, StringUtils.join(permissions, "|"));
     return true;
+  }
+
+  private boolean checkGen3Authorization(String teamProjectRole, String login) throws Exception {
+    logger.debug("Checking Gen3 Authorization for 'team project'={} and user={} using service={}", teamProjectRole, login, this.authorizationUrl);
+    RestTemplate restTemplate = new RestTemplate();
+    String arboristAuthorizationURL = this.authorizationUrl;
+    String requestBody = String.format("{\"username\": \"%s\"}", login);
+    String jsonResponseString = restTemplate.postForObject(arboristAuthorizationURL, requestBody, String.class);
+
+    JSONObject jsonObject = new JSONObject(jsonResponseString);
+
+    if (!jsonObject.keySet().contains(teamProjectRole)) {
+      logger.debug("User is not authorized to access this team project's data");
+      return false;
+    } else {
+      // TODO add more checks, e.g. whether the expected service / method config are also present...
+      Object teamProjectAuthorizations = jsonObject.get(teamProjectRole);
+      logger.debug("Found authorizations={}", teamProjectAuthorizations);
+      return true;
+    }
   }
 
   private URI getOAuthFailUri() throws URISyntaxException {
