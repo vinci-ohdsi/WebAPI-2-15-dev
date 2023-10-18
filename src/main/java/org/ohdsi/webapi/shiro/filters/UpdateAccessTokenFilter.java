@@ -5,6 +5,8 @@ import static org.ohdsi.webapi.shiro.management.AtlasSecurity.PERMISSIONS_ATTRIB
 import static org.ohdsi.webapi.shiro.management.AtlasSecurity.TOKEN_ATTRIBUTE;
 
 import io.buji.pac4j.subject.Pac4jPrincipal;
+
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.net.URI;
@@ -197,12 +199,35 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
     JSONObject jsonObject = new JSONObject(jsonResponseString);
 
     if (!jsonObject.keySet().contains(teamProjectRole)) {
-      logger.debug("User is not authorized to access this team project's data");
+      logger.warn("User is not authorized to access this team project's data");
       return false;
     } else {
-      // TODO add more checks, e.g. whether the expected service / method config are also present...
-      Object teamProjectAuthorizations = jsonObject.get(teamProjectRole);
+      JSONArray teamProjectAuthorizations = jsonObject.getJSONArray(teamProjectRole);
       logger.debug("Found authorizations={}", teamProjectAuthorizations);
+      // We expect only one authorization rule per teamproject:
+      if (teamProjectAuthorizations.length() != 1) {
+        logger.error("Only one authorization rule expected for 'teamproject'={}, found={}", teamProjectRole,
+          teamProjectAuthorizations.length());
+        return false;
+      }
+      JSONObject teamProjectAuthorization = teamProjectAuthorizations.getJSONObject(0);
+
+      // check if the authorization contains the right "service" and "method" values:
+      String expectedMethod = "access";
+      String expectedService = "atlas-argo-wrapper-and-cohort-middleware"; // TODO - make the service name configurable?
+      String service = teamProjectAuthorization.getString("service");
+      String method = teamProjectAuthorization.getString("method");
+      logger.debug("Parsed service={} and method={}", service, method);
+      if (!method.equalsIgnoreCase(expectedMethod)) {
+        logger.error("The 'teamproject' authorization method should be '{}', but found '{}'", expectedMethod, method);
+        return false;
+      }
+      logger.debug("Parsed method is as expected");
+      if (!service.equalsIgnoreCase(expectedService)) {
+        logger.error("The 'teamproject' authorization service should be '{}', but found '{}'", expectedService, service);
+        return false;
+      }
+      logger.debug("Parsed service is as expected");
       return true;
     }
   }
