@@ -139,6 +139,7 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
       session.stop();
     }
 
+    logger.debug("Check JWT: '{}'", jwt);
     if (jwt == null) { // dead check...jwt is always null...
       if (name == null) {
         name = login;
