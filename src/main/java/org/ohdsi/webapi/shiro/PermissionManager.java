@@ -241,7 +241,9 @@ public class PermissionManager {
     if (roles != null) {
       for (String roleName: roles) {
         // Temporary patch/workaround (in reality the role should have been added by sysadmin?):
-        pocAddUserRole(roleName);
+        if (!isSystemRole) {
+          pocAddUserRole(roleName);
+        }
         // end temporary patch
         RoleEntity role = this.getRoleByName(roleName, isSystemRole);
         if (role != null) {
@@ -252,6 +254,7 @@ public class PermissionManager {
   }
 
   private void addDefaultRolesForUser(String login, UserOrigin userOrigin, UserEntity user, Set<String> roles) {
+    logger.debug("Adding the following system roles for the user: roles={}", roles);
     addRolesForUser(login, userOrigin, user, roles,true);
   }
 
@@ -497,12 +500,15 @@ public class PermissionManager {
                                  final UserOrigin userOrigin, final String status) {
     UserRoleEntity relation = this.userRoleRepository.findByUserAndRole(user, role);
     if (relation == null) {
+      logger.debug("The system role={} is new for this user. Adding...", role.getName());
       relation = new UserRoleEntity();
       relation.setUser(user);
       relation.setRole(role);
       relation.setStatus(status);
       relation.setOrigin(userOrigin);
       relation = this.userRoleRepository.save(relation);
+    } else {
+        logger.debug("The user already had the system role={}", role.getName());
     }
 
     return relation;
