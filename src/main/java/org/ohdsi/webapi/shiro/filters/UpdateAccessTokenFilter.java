@@ -163,6 +163,7 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
               return false;
             }
             newUserRoles.add(teamProjectRole);
+            newUserRoles.add("Atlas users"); // TODO - review this part...maybe users can get this role when onboarding (system role?)
             authorizer.setCurrentTeamProjectRole(teamProjectRole);
           }
         }
