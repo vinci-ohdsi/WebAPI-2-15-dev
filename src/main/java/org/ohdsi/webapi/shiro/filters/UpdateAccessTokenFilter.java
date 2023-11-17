@@ -148,6 +148,7 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
         logger.debug("AUTHORIZATION_MODE in UpdateAccessTokenFilter == '{}'", this.authorizationMode);
         boolean resetRoles = false;
         Set<String> newUserRoles = new HashSet<String>();
+        Set<String> newDefaultRoles = new HashSet<String>(defaultRoles);
         if (this.authorizationMode.equals("teamproject")) {
           // in case of "teamproject" mode, we want all roles to be reset always, and
           // set to only the one requested/found in the request parameters (following lines below):
@@ -163,11 +164,11 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
               return false;
             }
             newUserRoles.add(teamProjectRole);
-            newUserRoles.add("Atlas users"); // TODO - review this part...maybe users can get this role when onboarding (system role?)
+            newDefaultRoles.add("Atlas users"); // TODO - review this part...maybe users can get this role when onboarding (system role?)
             authorizer.setCurrentTeamProjectRole(teamProjectRole);
           }
         }
-        this.authorizer.registerUser(login, name, defaultRoles, newUserRoles, resetRoles);
+        this.authorizer.registerUser(login, name, newDefaultRoles, newUserRoles, resetRoles);
         
       } catch (Exception e) {
         WebUtils.toHttp(response).setHeader("x-auth-error", e.getMessage());
