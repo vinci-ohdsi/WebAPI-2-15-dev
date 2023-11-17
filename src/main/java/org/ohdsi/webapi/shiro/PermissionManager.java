@@ -61,6 +61,8 @@ public class PermissionManager {
 
   private ThreadLocal<ConcurrentHashMap<String, UserSimpleAuthorizationInfo>> authorizationInfoCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 
+  private String currentTeamProjectRole = null;
+
   public RoleEntity addRole(String roleName, boolean isSystem) {
     logger.debug("Called addRole: {}", roleName);
 
@@ -552,5 +554,17 @@ public class PermissionManager {
 
   public boolean roleExists(String roleName) {
     return this.roleRepository.existsByName(roleName);
+  }
+
+  public void setCurrentTeamProjectRole(String teamProjectRole) {
+    this.currentTeamProjectRole = teamProjectRole;
+  }
+
+  public RoleEntity getCurrentTeamProjectRole() {
+    if (this.currentTeamProjectRole != null) {
+      return this.getRoleByName(this.currentTeamProjectRole, false);
+    } else {
+      return null;
+    }
   }
 }

@@ -163,6 +163,7 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
               return false;
             }
             newUserRoles.add(teamProjectRole);
+            authorizer.setCurrentTeamProjectRole(teamProjectRole);
           }
         }
         this.authorizer.registerUser(login, name, defaultRoles, newUserRoles, resetRoles);
