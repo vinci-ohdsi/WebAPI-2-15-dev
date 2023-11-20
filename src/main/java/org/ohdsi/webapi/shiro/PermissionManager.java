@@ -213,10 +213,12 @@ public class PermissionManager {
         removeAllUserRolesFromUser(login, user);
         // add back just the given newUserRoles:
         addRolesForUser(login, userOrigin, user, newUserRoles, false);
+        // make sure the default roles are there: TODO - discuss if really necessary....
+        addDefaultRolesForUser(login, userOrigin, user, defaultRoles);
       }
       // get user again, fresh from db with all new roles:
       user = userRepository.findOne(user.getId());
-      return user;
+      return user;  // >>>>>>>>>> RETURN! Add else for readability???
     }
 
     checkRoleIsAbsent(login, false, "User with such login has been improperly removed from the database. " +
@@ -232,7 +234,7 @@ public class PermissionManager {
     this.addUser(user, personalRole, userOrigin, null);
     addRolesForUser(login, userOrigin, user, newUserRoles, false);
     addDefaultRolesForUser(login, userOrigin, user, defaultRoles);
-    // // get user again, fresh from db with all new roles:
+    // get user again, fresh from db with all new roles:
     user = userRepository.findOne(user.getId());
     return user;
   }
@@ -500,7 +502,7 @@ public class PermissionManager {
                                  final UserOrigin userOrigin, final String status) {
     UserRoleEntity relation = this.userRoleRepository.findByUserAndRole(user, role);
     if (relation == null) {
-      logger.debug("The system role={} is new for this user. Adding...", role.getName());
+      logger.debug("The role={} is new for this user. Adding...", role.getName());
       relation = new UserRoleEntity();
       relation.setUser(user);
       relation.setRole(role);
@@ -508,7 +510,7 @@ public class PermissionManager {
       relation.setOrigin(userOrigin);
       relation = this.userRoleRepository.save(relation);
     } else {
-        logger.debug("The user already had the system role={}", role.getName());
+        logger.debug("The user already had the role={}", role.getName());
     }
 
     return relation;
