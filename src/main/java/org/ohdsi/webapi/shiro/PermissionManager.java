@@ -27,10 +27,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.Principal;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+import javax.management.relation.Role;
 
 /**
  *
@@ -61,7 +64,7 @@ public class PermissionManager {
 
   private ThreadLocal<ConcurrentHashMap<String, UserSimpleAuthorizationInfo>> authorizationInfoCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 
-  private String currentTeamProjectRole = null;
+  private Map<String, String> teamProjectRoles = new HashMap<>();
 
   public RoleEntity addRole(String roleName, boolean isSystem) {
     logger.debug("Called addRole: {}", roleName);
@@ -446,10 +449,12 @@ public class PermissionManager {
   }
 
   private UserEntity getUserByLogin(final String login) {
+    logger.debug("Looking for user login={}...", login);
     final UserEntity user = this.userRepository.findByLogin(login);
-    if (user == null)
+    if (user == null) {
+      logger.error("User does NOT exist for login={}...", login);
       throw new RuntimeException("User doesn't exist");
-
+    }
     return user;
   }
 
@@ -564,15 +569,13 @@ public class PermissionManager {
     return this.roleRepository.existsByName(roleName);
   }
 
-  public void setCurrentTeamProjectRole(String teamProjectRole) {
-    this.currentTeamProjectRole = teamProjectRole;
+  public void setCurrentTeamProjectRoleForCurrentUser(String teamProjectRole, String login) {
+    logger.debug("Current user in setCurrentTeamProjectRoleForCurrentUser() {}", login);
+    this.teamProjectRoles.put(login, teamProjectRole);
   }
 
-  public RoleEntity getCurrentTeamProjectRole() {
-    if (this.currentTeamProjectRole != null) {
-      return this.getRoleByName(this.currentTeamProjectRole, false);
-    } else {
-      return null;
-    }
+  public RoleEntity getCurrentTeamProjectRoleForCurrentUser() {
+    logger.debug("Current user in getCurrentTeamProjectRoleForCurrentUser(): {}", getCurrentUser().getLogin());
+    return this.getRoleByName(this.teamProjectRoles.get(getCurrentUser().getLogin()), false);
   }
 }

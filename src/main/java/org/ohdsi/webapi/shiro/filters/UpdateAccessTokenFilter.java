@@ -41,6 +41,7 @@ import org.pac4j.core.profile.CommonProfile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestTemplate;
+import org.ohdsi.webapi.shiro.Entities.RoleEntity;
 
 /**
  *
@@ -147,6 +148,7 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
       try {
         logger.debug("AUTHORIZATION_MODE in UpdateAccessTokenFilter == '{}'", this.authorizationMode);
         boolean resetRoles = false;
+        String teamProjectRole = null;
         Set<String> newUserRoles = new HashSet<String>();
         Set<String> newDefaultRoles = new HashSet<String>(defaultRoles);
         if (this.authorizationMode.equals("teamproject")) {
@@ -154,7 +156,7 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
           // set to only the one requested/found in the request parameters (following lines below):
           resetRoles = true;
           // check if a teamproject parameter is found in the request:
-          String teamProjectRole = extractTeamProjectFromRequestParameters(request);
+          teamProjectRole = extractTeamProjectFromRequestParameters(request);
           // if found, add teamproject as a role in the newUserRoles list:
           if (teamProjectRole != null) {
             // double check if this role has really been granted to the user:
@@ -165,11 +167,11 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
             }
             newUserRoles.add(teamProjectRole);
             newDefaultRoles.add("Atlas users"); // TODO - review this part...maybe users can get this role when onboarding (system role?)
-            authorizer.setCurrentTeamProjectRole(teamProjectRole);
           }
         }
         this.authorizer.registerUser(login, name, newDefaultRoles, newUserRoles, resetRoles);
-        
+        authorizer.setCurrentTeamProjectRoleForCurrentUser(teamProjectRole, login);
+
       } catch (Exception e) {
         WebUtils.toHttp(response).setHeader("x-auth-error", e.getMessage());
         throw new Exception(e);
@@ -294,6 +296,14 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
     String actionLocationUrl = httpRequest.getHeader("Action-Location");
     if (actionLocationUrl != null && actionLocationUrl.contains("teamproject=")) {
       String teamProject = actionLocationUrl.split("teamproject=")[1];
+      logger.debug("Found teamproject: {}", teamProject);
+      return teamProject;
+    }
+
+    logger.debug("Fallback3: Looking for teamproject in cache in case of /user/refresh or /user/me request: {}....", url);
+    if (url.endsWith("/user/refresh") || url.endsWith("/user/me")) {
+      RoleEntity teamProjectRole = authorizer.getCurrentTeamProjectRoleForCurrentUser();
+      String teamProject = teamProjectRole.getName();
       logger.debug("Found teamproject: {}", teamProject);
       return teamProject;
     }

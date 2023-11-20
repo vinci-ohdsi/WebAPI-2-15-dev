@@ -80,7 +80,7 @@ public abstract class EntityPermissionSchema {
 
     protected void addPermissionsToCurrentTeamProjectFromTemplate(CommonEntity commonEntity, Map<String, String> template) {
 
-        RoleEntity role = permissionManager.getCurrentTeamProjectRole();
+        RoleEntity role = permissionManager.getCurrentTeamProjectRoleForCurrentUser();
         if (role == null) {
             throw new RuntimeException("Expected a teamproject role but found none!");
         }
