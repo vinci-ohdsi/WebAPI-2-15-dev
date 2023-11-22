@@ -15,7 +15,6 @@ import org.apache.shiro.web.util.WebUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.ohdsi.webapi.shiro.PermissionManager;
-import org.ohdsi.webapi.shiro.Entities.RoleEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestTemplate;
@@ -25,7 +24,7 @@ import org.springframework.web.client.RestTemplate;
  * @author Pieter Lukasse
  */
 public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
-  
+
   private final Logger logger = LoggerFactory.getLogger(TeamProjectBasedAuthorizingFilter.class);
 
   private final PermissionManager authorizer;
@@ -48,7 +47,7 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
 
   @Override
   protected boolean preHandle(ServletRequest request, ServletResponse response) throws Exception {
-    
+
     try {
         logger.debug("preHandle in TeamProjectBasedAuthorizingFilter == '{}'", this.authorizationMode);
         boolean resetRoles = false;
@@ -82,7 +81,7 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
         WebUtils.toHttp(response).setHeader("x-auth-error", e.getMessage());
         throw new Exception(e);
       }
-    
+
     return true;
   }
 
@@ -165,14 +164,6 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
       logger.debug("Found teamproject: {}", teamProject);
       return teamProject;
     }
-
-    // logger.debug("Fallback3: Looking for teamproject in cache in case of /user/refresh or /user/me request: {}....", url);
-    // if (url.endsWith("/user/refresh") || url.endsWith("/user/me")) {
-    //   RoleEntity teamProjectRole = authorizer.getCurrentTeamProjectRoleForCurrentUser();
-    //   String teamProject = teamProjectRole.getName();
-    //   logger.debug("Found teamproject: {}", teamProject);
-    //   return teamProject;
-    // }
 
     logger.debug("Found NO teamproject.");
     return null;
