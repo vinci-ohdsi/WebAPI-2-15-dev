@@ -2,6 +2,9 @@ package org.ohdsi.webapi.shiro;
 
 import com.odysseusinc.logging.event.AddUserEvent;
 import com.odysseusinc.logging.event.DeleteRoleEvent;
+
+import io.buji.pac4j.subject.Pac4jPrincipal;
+
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.UnknownAccountException;
 import org.apache.shiro.subject.Subject;
@@ -175,6 +178,11 @@ public class PermissionManager {
     this.authorizationInfoCache.set(new ConcurrentHashMap<>());
   }
 
+  @Transactional
+  public void updateUser(String login, Set<String> defaultRoles, Set<String> newUserRoles,
+      boolean resetRoles) {
+        registerUser(login, null, UserOrigin.SYSTEM, defaultRoles, newUserRoles, resetRoles);
+  }
 
   @Transactional
   public void registerUser(String login, String name, Set<String> defaultRoles, Set<String> newUserRoles,
@@ -461,7 +469,7 @@ public class PermissionManager {
   private RoleEntity getRoleByName(String roleName, Boolean isSystemRole) {
     final RoleEntity roleEntity = this.roleRepository.findByNameAndSystemRole(roleName, isSystemRole);
     if (roleEntity == null)
-      throw new RuntimeException("Role doesn't exist");
+      throw new RuntimeException("Role doesn't exist:" + roleName);
 
     return roleEntity;
   }
@@ -473,7 +481,7 @@ public class PermissionManager {
   private RoleEntity getRoleById(Long roleId) {
     final RoleEntity roleEntity = this.roleRepository.findById(roleId);
     if (roleEntity == null)
-      throw new RuntimeException("Role doesn't exist");
+      throw new RuntimeException("Role doesn't exist:" + roleId);
 
     return roleEntity;
   }
@@ -525,11 +533,20 @@ public class PermissionManager {
     Subject subject = SecurityUtils.getSubject();
     Object principalObject = subject.getPrincipals().getPrimaryPrincipal();
 
-    if (principalObject instanceof String)
+    if (principalObject instanceof String) {
+      logger.debug("principal IS STRING: " + principalObject);
       return (String)principalObject;
+    }
+
+    if (principalObject instanceof Pac4jPrincipal) {
+      String login = ((Pac4jPrincipal)principalObject).getProfile().getEmail();
+      logger.debug("principal IS Pac4jPrincipal: " + login);
+      return login;
+    }
 
     if (principalObject instanceof Principal) {
       Principal principal = (Principal)principalObject;
+      logger.debug("principal IS Principal: " + principal.getName());
       return principal.getName();
     }
 
@@ -576,6 +593,10 @@ public class PermissionManager {
 
   public RoleEntity getCurrentTeamProjectRoleForCurrentUser() {
     logger.debug("Current user in getCurrentTeamProjectRoleForCurrentUser(): {}", getCurrentUser().getLogin());
-    return this.getRoleByName(this.teamProjectRoles.get(getCurrentUser().getLogin()), false);
+    if (this.teamProjectRoles.get(getCurrentUser().getLogin()) == null) {
+      return null;
+    } else {
+      return this.getRoleByName(this.teamProjectRoles.get(getCurrentUser().getLogin()), false);
+    }
   }
 }

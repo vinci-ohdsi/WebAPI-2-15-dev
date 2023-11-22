@@ -5,23 +5,16 @@ import static org.ohdsi.webapi.shiro.management.AtlasSecurity.PERMISSIONS_ATTRIB
 import static org.ohdsi.webapi.shiro.management.AtlasSecurity.TOKEN_ATTRIBUTE;
 
 import io.buji.pac4j.subject.Pac4jPrincipal;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
-
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.Principal;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Enumeration;
-import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.ws.rs.core.UriBuilder;
@@ -38,39 +31,27 @@ import org.ohdsi.webapi.shiro.PermissionManager;
 import org.ohdsi.webapi.shiro.TokenManager;
 import org.ohdsi.webapi.util.UserUtils;
 import org.pac4j.core.profile.CommonProfile;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.web.client.RestTemplate;
-import org.ohdsi.webapi.shiro.Entities.RoleEntity;
 
 /**
  *
  * @author gennadiy.anisimov
  */
 public class UpdateAccessTokenFilter extends AdviceFilter {
-  private final Logger logger = LoggerFactory.getLogger(UpdateAccessTokenFilter.class);
-
+  
   private final PermissionManager authorizer;
   private final int tokenExpirationIntervalInSeconds;
   private final Set<String> defaultRoles;
   private final String onFailRedirectUrl;
-  private final String authorizationMode;
-  private final String authorizationUrl;
 
   public UpdateAccessTokenFilter(
           PermissionManager authorizer,
           Set<String> defaultRoles,
           int tokenExpirationIntervalInSeconds,
-          String onFailRedirectUrl,
-          String authorizationMode,
-          String authorizationUrl) {
+          String onFailRedirectUrl) {
     this.authorizer = authorizer;
     this.tokenExpirationIntervalInSeconds = tokenExpirationIntervalInSeconds;
     this.defaultRoles = defaultRoles;
     this.onFailRedirectUrl = onFailRedirectUrl;
-    this.authorizationMode = authorizationMode;
-    this.authorizationUrl = authorizationUrl;
-    logger.debug("AUTHORIZATION_MODE in UpdateAccessTokenFilter constructor == '{}'", this.authorizationMode);
   }
   
   @Override
@@ -140,38 +121,12 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
       session.stop();
     }
 
-    logger.debug("Check JWT: '{}'", jwt);
-    if (jwt == null) { // dead check...jwt is always null...
+    if (jwt == null) {
       if (name == null) {
         name = login;
       }
       try {
-        logger.debug("AUTHORIZATION_MODE in UpdateAccessTokenFilter == '{}'", this.authorizationMode);
-        boolean resetRoles = false;
-        String teamProjectRole = null;
-        Set<String> newUserRoles = new HashSet<String>();
-        Set<String> newDefaultRoles = new HashSet<String>(defaultRoles);
-        if (this.authorizationMode.equals("teamproject")) {
-          // in case of "teamproject" mode, we want all roles to be reset always, and
-          // set to only the one requested/found in the request parameters (following lines below):
-          resetRoles = true;
-          // check if a teamproject parameter is found in the request:
-          teamProjectRole = extractTeamProjectFromRequestParameters(request);
-          // if found, add teamproject as a role in the newUserRoles list:
-          if (teamProjectRole != null) {
-            // double check if this role has really been granted to the user:
-            if (checkGen3Authorization(teamProjectRole, login) == false) {
-              WebUtils.toHttp(response).sendError(HttpServletResponse.SC_FORBIDDEN,
-               "User is not authorized to access this team project's data");
-              return false;
-            }
-            newUserRoles.add(teamProjectRole);
-            newDefaultRoles.add("Atlas users"); // TODO - review this part...maybe users can get this role when onboarding (system role?)
-          }
-        }
-        this.authorizer.registerUser(login, name, newDefaultRoles, newUserRoles, resetRoles);
-        authorizer.setCurrentTeamProjectRoleForCurrentUser(teamProjectRole, login);
-
+        this.authorizer.registerUser(login, name, defaultRoles);
       } catch (Exception e) {
         WebUtils.toHttp(response).setHeader("x-auth-error", e.getMessage());
         throw new Exception(e);
@@ -193,49 +148,6 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
     Collection<String> permissions = this.authorizer.getAuthorizationInfo(login).getStringPermissions();
     request.setAttribute(PERMISSIONS_ATTRIBUTE, StringUtils.join(permissions, "|"));
     return true;
-  }
-
-  private boolean checkGen3Authorization(String teamProjectRole, String login) throws Exception {
-    logger.debug("Checking Gen3 Authorization for 'team project'={} and user={} using service={}", teamProjectRole, login, this.authorizationUrl);
-    RestTemplate restTemplate = new RestTemplate();
-    String arboristAuthorizationURL = this.authorizationUrl;
-    String requestBody = String.format("{\"username\": \"%s\"}", login);
-    String jsonResponseString = restTemplate.postForObject(arboristAuthorizationURL, requestBody, String.class);
-
-    JSONObject jsonObject = new JSONObject(jsonResponseString);
-
-    if (!jsonObject.keySet().contains(teamProjectRole)) {
-      logger.warn("User is not authorized to access this team project's data");
-      return false;
-    } else {
-      JSONArray teamProjectAuthorizations = jsonObject.getJSONArray(teamProjectRole);
-      logger.debug("Found authorizations={}", teamProjectAuthorizations);
-      // We expect only one authorization rule per teamproject:
-      if (teamProjectAuthorizations.length() != 1) {
-        logger.error("Only one authorization rule expected for 'teamproject'={}, found={}", teamProjectRole,
-          teamProjectAuthorizations.length());
-        return false;
-      }
-      JSONObject teamProjectAuthorization = teamProjectAuthorizations.getJSONObject(0);
-
-      // check if the authorization contains the right "service" and "method" values:
-      String expectedMethod = "access";
-      String expectedService = "atlas-argo-wrapper-and-cohort-middleware"; // TODO - make the service name configurable?
-      String service = teamProjectAuthorization.getString("service");
-      String method = teamProjectAuthorization.getString("method");
-      logger.debug("Parsed service={} and method={}", service, method);
-      if (!method.equalsIgnoreCase(expectedMethod)) {
-        logger.error("The 'teamproject' authorization method should be '{}', but found '{}'", expectedMethod, method);
-        return false;
-      }
-      logger.debug("Parsed method is as expected");
-      if (!service.equalsIgnoreCase(expectedService)) {
-        logger.error("The 'teamproject' authorization service should be '{}', but found '{}'", expectedService, service);
-        return false;
-      }
-      logger.debug("Parsed service is as expected");
-      return true;
-    }
   }
 
   private URI getOAuthFailUri() throws URISyntaxException {
@@ -261,70 +173,5 @@ public class UpdateAccessTokenFilter extends AdviceFilter {
     Calendar calendar = Calendar.getInstance();
     calendar.add(Calendar.SECOND, expirationIntervalInSeconds);
     return calendar.getTime();
-  }
-
-  private String extractTeamProjectFromRequestParameters(ServletRequest request) {
-    // Get the url
-    HttpServletRequest httpRequest = (HttpServletRequest) request;
-    String url = httpRequest.getRequestURL().toString();
-
-    // try to find it in the redirectUrl parameter:
-    logger.debug("Looking for redirectUrl in request: {}....", url);
-    String[] redirectUrlParams = getParameterValues(request, "redirectUrl");
-    if (redirectUrlParams != null) {
-      logger.debug("Parameter redirectUrl found. Checking if it contains teamproject....");
-      // teamProject will be in first one in this case...as only parameter:
-      String firstParameter = redirectUrlParams[0].toLowerCase();
-      if (firstParameter.contains("teamproject=")) {
-        String teamProject = firstParameter.split("teamproject=")[1];
-        logger.debug("Found teamproject: {}", teamProject);
-        return teamProject;
-      }
-    }
-
-    // try to find "teamproject" param in url itself (there will be no redirectUrl if user session is still valid):
-    logger.debug("Fallback1: Looking for teamproject in request: {}....", url);
-    String[] teamProjectParams = getParameterValues(request, "teamproject");
-    if (teamProjectParams != null) {
-      logger.debug("Parameter teamproject found. Parsing....");
-      String teamProject = teamProjectParams[0].toLowerCase();
-      logger.debug("Found teamproject: {}", teamProject);
-      return teamProject;
-    }
-
-    logger.debug("Fallback2: Looking for teamproject in Action-Location header of request: {}....", url);
-    String actionLocationUrl = httpRequest.getHeader("Action-Location");
-    if (actionLocationUrl != null && actionLocationUrl.contains("teamproject=")) {
-      String teamProject = actionLocationUrl.split("teamproject=")[1];
-      logger.debug("Found teamproject: {}", teamProject);
-      return teamProject;
-    }
-
-    logger.debug("Fallback3: Looking for teamproject in cache in case of /user/refresh or /user/me request: {}....", url);
-    if (url.endsWith("/user/refresh") || url.endsWith("/user/me")) {
-      RoleEntity teamProjectRole = authorizer.getCurrentTeamProjectRoleForCurrentUser();
-      String teamProject = teamProjectRole.getName();
-      logger.debug("Found teamproject: {}", teamProject);
-      return teamProject;
-    }
-
-    logger.debug("Found NO teamproject.");
-    return null;
-  }
-
-  private String[] getParameterValues(ServletRequest request, String parameterName) {
-    // Get the parameters
-    logger.debug("Looking for parameter with name: {} ...", parameterName);
-    Enumeration<String> paramNames = request.getParameterNames();
-    while(paramNames.hasMoreElements()) {
-        String paramName = paramNames.nextElement();
-        logger.debug("Parameter name: {}", paramName);
-        if (paramName.equals(parameterName)) {
-          String[] paramValues = request.getParameterValues(paramName);
-          return paramValues;
-        }
-    }
-    logger.debug("Found NO parameter with name: {}", parameterName);
-    return null;
   }
 }

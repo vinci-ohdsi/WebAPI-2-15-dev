@@ -280,7 +280,7 @@ public class AtlasRegularSecurity extends AtlasSecurity {
         logger.debug("Initializing UpdateAccessTokenFilter with AUTHORIZATION_MODE === '{}'", this.authorizationMode);
         logger.debug("Initializing UpdateAccessTokenFilter with AUTHORIZATION_URL === '{}'", this.authorizationUrl);
         filters.put(UPDATE_TOKEN, new UpdateAccessTokenFilter(this.authorizer, this.defaultRoles, this.tokenExpirationIntervalInSeconds,
-                this.redirectUrl, this.authorizationMode, this.authorizationUrl));
+                this.redirectUrl));
 
         filters.put(ACCESS_AUTHC, new GoogleAccessTokenFilter(restTemplate, permissionManager, Collections.emptySet()));
         filters.put(JWT_AUTHC, new AtlasJwtAuthFilter());
@@ -417,6 +417,7 @@ public class AtlasRegularSecurity extends AtlasSecurity {
                 .setRestFilters(SSL, NO_SESSION_CREATION, CORS, NO_CACHE)
                 .setAuthcFilter(authcFilters.toArray(new FilterTemplates[0]))
                 .setAuthzFilter(AUTHZ)
+                .setTeamProjectAuthzFilter(TEAM_PROJECT_AUTHZ)
                 // login/logout
                 .addRestPath("/user/refresh", JWT_AUTHC, UPDATE_TOKEN, SEND_TOKEN_IN_HEADER)
                 .addProtectedRestPath("/user/runas", RUN_AS, UPDATE_TOKEN, SEND_TOKEN_IN_HEADER)
@@ -433,7 +434,7 @@ public class AtlasRegularSecurity extends AtlasSecurity {
 
         if (this.openidAuthEnabled) {
             filterChainBuilder
-                    .addRestPath("/user/login/openid", FORCE_SESSION_CREATION, OIDC_AUTH, UPDATE_TOKEN, SEND_TOKEN_IN_URL)
+                    .addRestPath("/user/login/openid", FORCE_SESSION_CREATION, OIDC_AUTH, UPDATE_TOKEN, TEAM_PROJECT_AUTHZ, SEND_TOKEN_IN_URL)
                     .addRestPath("/user/login/openidDirect", FORCE_SESSION_CREATION, OIDC_DIRECT_AUTH, UPDATE_TOKEN, SEND_TOKEN_IN_HEADER);
         }
 

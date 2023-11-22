@@ -21,6 +21,7 @@ import org.ohdsi.webapi.shiro.PermissionManager;
 import org.ohdsi.webapi.shiro.filters.CorsFilter;
 import org.ohdsi.webapi.shiro.filters.ForceSessionCreationFilter;
 import org.ohdsi.webapi.shiro.filters.ResponseNoCacheFilter;
+import org.ohdsi.webapi.shiro.filters.TeamProjectBasedAuthorizingFilter;
 import org.ohdsi.webapi.shiro.filters.UrlBasedAuthorizingFilter;
 import org.ohdsi.webapi.source.SourceRepository;
 import org.slf4j.Logger;
@@ -37,6 +38,7 @@ import static org.ohdsi.webapi.shiro.management.FilterTemplates.JWT_AUTHC;
 import static org.ohdsi.webapi.shiro.management.FilterTemplates.NO_CACHE;
 import static org.ohdsi.webapi.shiro.management.FilterTemplates.NO_SESSION_CREATION;
 import static org.ohdsi.webapi.shiro.management.FilterTemplates.SSL;
+import static org.ohdsi.webapi.shiro.management.FilterTemplates.TEAM_PROJECT_AUTHZ;
 
 /**
  *
@@ -67,6 +69,12 @@ public abstract class AtlasSecurity extends Security {
 
   @Value("${security.ssl.enabled}")
   private boolean sslEnabled;
+
+  @Value("${security.ohdsi.custom.authorization.mode}")
+  private String authorizationMode;
+
+  @Value("${security.ohdsi.custom.authorization.url}")
+  private String authorizationUrl;
 
   private final EntityPermissionSchemaResolver permissionSchemaResolver;
 
@@ -130,6 +138,7 @@ public abstract class AtlasSecurity extends Security {
     filters.put(NO_SESSION_CREATION, new NoSessionCreationFilter());
     filters.put(FORCE_SESSION_CREATION, new ForceSessionCreationFilter());
     filters.put(AUTHZ, new UrlBasedAuthorizingFilter());
+    filters.put(TEAM_PROJECT_AUTHZ, new TeamProjectBasedAuthorizingFilter(this.authorizer, this.defaultRoles, this.authorizationMode, this.authorizationUrl));
     filters.put(CORS, new CorsFilter());
     filters.put(SSL, this.getSslFilter());
     filters.put(NO_CACHE, this.getNoCacheFilter());

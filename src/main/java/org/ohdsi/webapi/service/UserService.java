@@ -161,7 +161,7 @@ public class UserService {
   public Role updateRole(@PathParam("roleId") Long id, Role role) throws Exception {
     RoleEntity roleEntity = this.authorizer.getRole(id);
     if (roleEntity == null) {
-      throw new Exception("Role doesn't exist");
+      throw new Exception("Role doesn't exist: " + id);
     }
     roleEntity.setName(role.role);
     roleEntity = this.authorizer.updateRole(roleEntity);
