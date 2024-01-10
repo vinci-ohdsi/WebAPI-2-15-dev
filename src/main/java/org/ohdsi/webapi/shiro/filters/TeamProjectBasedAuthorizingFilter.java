@@ -72,7 +72,6 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
             }
             newUserRoles.add(teamProjectRole);
             newDefaultRoles.add("read restricted Atlas Users"); // system role 15
-            newDefaultRoles.add("Source user (EUNOMIA)"); // system role 1000
             this.authorizer.updateUser(login, newDefaultRoles, newUserRoles, resetRoles);
             this.authorizer.setCurrentTeamProjectRoleForCurrentUser(teamProjectRole, login);
           }
