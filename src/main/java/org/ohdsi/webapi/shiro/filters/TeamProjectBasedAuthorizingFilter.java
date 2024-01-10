@@ -133,6 +133,10 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
     HttpServletRequest httpRequest = (HttpServletRequest) request;
     String url = httpRequest.getRequestURL().toString();
 
+    String currentTeamProjectName = this.authorizer.getCurrentTeamProjectRoleForCurrentUser() != null ? this.authorizer.getCurrentTeamProjectRoleForCurrentUser().getName() : "";
+    logger.debug("Current teamproject: {}...", currentTeamProjectName);
+    logger.debug("Checking if a teamproject has been specified in the request...");
+
     // try to find it in the redirectUrl parameter:
     logger.debug("Looking for redirectUrl in request: {}....", url);
     String[] redirectUrlParams = getParameterValues(request, "redirectUrl");
@@ -165,7 +169,8 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
       return teamProject;
     }
 
-    logger.debug("Found NO teamproject.");
+    logger.debug("Found NO teamproject explicitly set in the request, so keeping team project: {}.",
+      currentTeamProjectName);
     return null;
   }
 
