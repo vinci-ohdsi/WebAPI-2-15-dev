@@ -175,8 +175,11 @@ public class SourceService extends AbstractDaoService {
 
         try {
             checkConnection(source);
+            logger.debug("Connection worked.");
             return true;
         } catch (CannotGetJdbcConnectionException ex) {
+            logger.debug("Connection failed: {}", ex.getMessage());
+            ex.printStackTrace();
             return false;
         }
     }
