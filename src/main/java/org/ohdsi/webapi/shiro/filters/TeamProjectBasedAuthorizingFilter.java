@@ -50,29 +50,29 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
 
     try {
         logger.debug("preHandle in TeamProjectBasedAuthorizingFilter == '{}'", this.authorizationMode);
-        boolean resetRoles = false;
         String teamProjectRole = null;
         Set<String> newUserRoles = new HashSet<String>();
         Set<String> newDefaultRoles = new HashSet<String>(defaultRoles);
         if (this.authorizationMode.equals("teamproject") && SecurityUtils.getSubject().isAuthenticated()) {
           // in case of "teamproject" mode, we want all roles to be reset always, and
           // set to only the one requested/found in the request parameters (following lines below):
-          resetRoles = true;
+          String login = this.authorizer.getCurrentUser().getLogin();
+          newDefaultRoles.add("read restricted Atlas Users"); // system role 15
+          this.authorizer.updateUser(login, newDefaultRoles, newUserRoles, true);
           // check if a teamproject parameter is found in the request:
           teamProjectRole = extractTeamProjectFromRequestParameters(request);
           // if found, and teamproject is different from current one, add teamproject as a role in the newUserRoles list:
           if (teamProjectRole != null &&
               (this.authorizer.getCurrentTeamProjectRoleForCurrentUser() == null || !teamProjectRole.equals(this.authorizer.getCurrentTeamProjectRoleForCurrentUser().getName()))) {
             // double check if this role has really been granted to the user:
-            String login = this.authorizer.getCurrentUser().getLogin();
             if (checkGen3Authorization(teamProjectRole, login) == false) {
               WebUtils.toHttp(response).sendError(HttpServletResponse.SC_FORBIDDEN,
                "User is not authorized to access this team project's data");
               return false;
             }
+            // add teamproject role:
             newUserRoles.add(teamProjectRole);
-            newDefaultRoles.add("read restricted Atlas Users"); // system role 15
-            this.authorizer.updateUser(login, newDefaultRoles, newUserRoles, resetRoles);
+            this.authorizer.updateUser(login, newDefaultRoles, newUserRoles, true);
             this.authorizer.setCurrentTeamProjectRoleForCurrentUser(teamProjectRole, login);
           }
         }
