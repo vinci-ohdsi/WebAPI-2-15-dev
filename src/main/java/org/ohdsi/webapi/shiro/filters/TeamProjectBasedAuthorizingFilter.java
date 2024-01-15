@@ -57,24 +57,23 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
           // in case of "teamproject" mode, we want all roles to be reset always, and
           // set to only the one requested/found in the request parameters (following lines below):
           String login = this.authorizer.getCurrentUser().getLogin();
-          newDefaultRoles.add("read restricted Atlas Users"); // system role 15
-          this.authorizer.updateUser(login, newDefaultRoles, newUserRoles, true);
           // check if a teamproject parameter is found in the request:
           teamProjectRole = extractTeamProjectFromRequestParameters(request);
           // if found, and teamproject is different from current one, add teamproject as a role in the newUserRoles list:
-          if (teamProjectRole != null &&
-              (this.authorizer.getCurrentTeamProjectRoleForCurrentUser() == null || !teamProjectRole.equals(this.authorizer.getCurrentTeamProjectRoleForCurrentUser().getName()))) {
+          if (teamProjectRole != null) {
             // double check if this role has really been granted to the user:
             if (checkGen3Authorization(teamProjectRole, login) == false) {
               WebUtils.toHttp(response).sendError(HttpServletResponse.SC_FORBIDDEN,
                "User is not authorized to access this team project's data");
               return false;
             }
-            // add teamproject role:
+            // add teamproject role and related system role that
+            // enables read restrictions/permissions based read access configurations:
+            newDefaultRoles.add("read restricted Atlas Users"); // system role 15
             newUserRoles.add(teamProjectRole);
-            this.authorizer.updateUser(login, newDefaultRoles, newUserRoles, true);
             this.authorizer.setCurrentTeamProjectRoleForCurrentUser(teamProjectRole, login);
           }
+          this.authorizer.updateUser(login, newDefaultRoles, newUserRoles, true);
         }
 
       } catch (Exception e) {
@@ -171,7 +170,7 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
 
     logger.debug("Found NO teamproject explicitly set in the request, so keeping team project: {}.",
       currentTeamProjectName);
-    return null;
+    return currentTeamProjectName;
   }
 
   private String[] getParameterValues(ServletRequest request, String parameterName) {
