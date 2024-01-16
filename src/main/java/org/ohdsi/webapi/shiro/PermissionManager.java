@@ -221,7 +221,7 @@ public class PermissionManager {
       }
       if (resetRoles) {
         // remove all user roles:
-        removeAllUserRolesFromUser(login, user);
+        removeAllUserRolesFromUser(login, user, newUserRoles);
         // add back just the given newUserRoles:
         addRolesForUser(login, userOrigin, user, newUserRoles, false);
         // make sure the default roles are there: TODO - discuss if really necessary....
@@ -271,11 +271,11 @@ public class PermissionManager {
     addRolesForUser(login, userOrigin, user, roles,true);
   }
 
-  private void removeAllUserRolesFromUser(String login, UserEntity user) {
+  private void removeAllUserRolesFromUser(String login, UserEntity user, final Set<String> rolesToSkip) {
     Set<RoleEntity> userRoles = this.getUserRoles(user);
-    // remove all roles except the personal role:
-    userRoles.stream().filter(role -> !role.getName().equalsIgnoreCase(login)).forEach(userRole -> {
-        this.removeUserFromUserRole(userRole.getName(), login);
+    // remove all roles except the personal role and any role in the rolesToSkip:
+    userRoles.stream().filter(role -> !role.getName().equalsIgnoreCase(login) && !rolesToSkip.contains(role.getName())).forEach(role -> {
+        this.removeUserFromUserRole(role.getName(), login);
     });
   }
 

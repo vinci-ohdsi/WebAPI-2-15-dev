@@ -72,8 +72,10 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
             newDefaultRoles.add("read restricted Atlas Users"); // system role 15
             newUserRoles.add(teamProjectRole);
             this.authorizer.setCurrentTeamProjectRoleForCurrentUser(teamProjectRole, login);
+            this.authorizer.updateUser(login, newDefaultRoles, newUserRoles, true);
+          } else {
+            throw new Exception("The teamproject is compulsory when on authorizationMode==teamproject configuration");
           }
-          this.authorizer.updateUser(login, newDefaultRoles, newUserRoles, true);
         }
 
       } catch (Exception e) {
