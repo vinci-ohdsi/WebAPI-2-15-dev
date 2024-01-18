@@ -29,8 +29,8 @@ RUN mvn package ${MAVEN_PARAMS} \
     && jar -xf WebAPI.war \
     && rm WebAPI.war
 
-# OHDSI WebAPI and ATLAS web application running as a Spring Boot application with Java 11
-FROM openjdk:8-jre-slim
+# OHDSI WebAPI and ATLAS web application running as a Spring Boot application with Java 8
+FROM amazoncorretto:8u402-al2023
 
 MAINTAINER Lee Evans - www.ltscomputingllc.com
 
