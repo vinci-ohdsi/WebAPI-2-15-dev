@@ -12,7 +12,7 @@ RUN curl -LSsO https://github.com/open-telemetry/opentelemetry-java-instrumentat
 COPY pom.xml /code/
 RUN mkdir .git \
     && mvn package \
-    -P${MAVEN_PROFILE}
+     -P${MAVEN_PROFILE}
 
 ARG GIT_BRANCH=unknown
 ARG GIT_COMMIT_ID_ABBREV=unknown
@@ -57,14 +57,21 @@ COPY --from=builder /code/war/META-INF META-INF
 
 EXPOSE 8080
 
-USER 0
+#USER 0
 
-RUN mkdir /usr/local/share/aws-certs \
+RUN echo $JAVA_HOME && mkdir /usr/local/share/aws-certs \
     && curl https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem -o /usr/local/share/aws-certs/us-east-1-bundle.pem \
     && cd $JAVA_HOME/jre/lib/security \
     && keytool -import -trustcacerts -storepass changeit -noprompt -alias aws -file /usr/local/share/aws-certs/us-east-1-bundle.pem 
 
-USER 101
+#USER 101
+
+# Copy your custom CA certificates to the container
+RUN cp /usr/local/share/aws-certs/us-east-1-bundle.pem /etc/pki/ca-trust/source/anchors/
+
+# Update the CA certificate store
+RUN update-ca-trust
+
 
 # Directly run the code as a WAR.
 CMD exec java ${DEFAULT_JAVA_OPTS} ${JAVA_OPTS} \
