@@ -186,7 +186,7 @@ public class PermissionManager {
   }
 
   @Transactional
-  public void registerUser(String login, String name, Set<String> defaultRoles, Set<String> newUserRoles,
+  private void registerUser(String login, String name, Set<String> defaultRoles, Set<String> newUserRoles,
       boolean resetRoles) {
         registerUser(login, name, UserOrigin.SYSTEM, defaultRoles, newUserRoles, resetRoles);
   }
@@ -203,7 +203,7 @@ public class PermissionManager {
   }
   
   @Transactional
-  public UserEntity registerUser(final String login, final String name, final UserOrigin userOrigin,
+  private UserEntity registerUser(final String login, final String name, final UserOrigin userOrigin,
                                  final Set<String> defaultRoles, final Set<String> newUserRoles, boolean resetRoles) {
     logger.debug("Called registerUser with resetRoles: login={}, reset roles={}, default roles={}, new user roles={}",
       login, resetRoles, defaultRoles, newUserRoles);
