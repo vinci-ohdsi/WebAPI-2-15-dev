@@ -30,6 +30,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.Principal;
+import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -67,7 +68,7 @@ public class PermissionManager {
 
   private ThreadLocal<ConcurrentHashMap<String, UserSimpleAuthorizationInfo>> authorizationInfoCache = ThreadLocal.withInitial(ConcurrentHashMap::new);
 
-  private Map<String, String> teamProjectRoles = new HashMap<>();
+  private Map<AbstractMap.SimpleEntry<String,String>, String> teamProjectRoles = new HashMap<>();
 
   public RoleEntity addRole(String roleName, boolean isSystem) {
     logger.debug("Called addRole: {}", roleName);
@@ -586,17 +587,29 @@ public class PermissionManager {
     return this.roleRepository.existsByName(roleName);
   }
 
+  private String getCurrentUserSessionId() {
+    Subject subject = SecurityUtils.getSubject();
+    return subject.getSession().getId().toString();
+  }
+
+  private AbstractMap.SimpleEntry<String,String> getCurrentUserAndSessionTuple() {
+    AbstractMap.SimpleEntry<String, String> userAndSessionTuple = new AbstractMap.SimpleEntry<>
+      (getCurrentUser().getLogin(), getCurrentUserSessionId());
+    return userAndSessionTuple;
+  }
+
   public void setCurrentTeamProjectRoleForCurrentUser(String teamProjectRole, String login) {
     logger.debug("Current user in setCurrentTeamProjectRoleForCurrentUser() {}", login);
-    this.teamProjectRoles.put(login, teamProjectRole);
+    this.teamProjectRoles.put(getCurrentUserAndSessionTuple(), teamProjectRole);
   }
 
   public RoleEntity getCurrentTeamProjectRoleForCurrentUser() {
     logger.debug("Current user in getCurrentTeamProjectRoleForCurrentUser(): {}", getCurrentUser().getLogin());
-    if (this.teamProjectRoles.get(getCurrentUser().getLogin()) == null) {
+    String teamProjectRole = this.teamProjectRoles.get(getCurrentUserAndSessionTuple());
+    if (teamProjectRole == null) {
       return null;
     } else {
-      return this.getRoleByName(this.teamProjectRoles.get(getCurrentUser().getLogin()), false);
+      return this.getRoleByName(teamProjectRole, false);
     }
   }
 }

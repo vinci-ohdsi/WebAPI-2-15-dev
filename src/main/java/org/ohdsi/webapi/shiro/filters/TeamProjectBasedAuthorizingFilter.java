@@ -59,7 +59,7 @@ public class TeamProjectBasedAuthorizingFilter extends AdviceFilter {
           String login = this.authorizer.getCurrentUser().getLogin();
           // check if a teamproject parameter is found in the request:
           teamProjectRole = extractTeamProjectFromRequestParameters(request);
-          // if found, and teamproject is different from current one, add teamproject as a role in the newUserRoles list:
+          // if found, add teamproject as a role in the newUserRoles list:
           if (teamProjectRole != null) {
             // double check if this role has really been granted to the user:
             if (checkGen3Authorization(teamProjectRole, login) == false) {
