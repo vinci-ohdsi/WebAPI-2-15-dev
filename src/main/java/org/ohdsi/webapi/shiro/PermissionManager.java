@@ -589,7 +589,7 @@ public class PermissionManager {
 
   private String getCurrentUserSessionId() {
     Subject subject = SecurityUtils.getSubject();
-    return subject.getSession().getId().toString();
+    return subject.getSession(false).getId().toString();
   }
 
   private AbstractMap.SimpleEntry<String,String> getCurrentUserAndSessionTuple() {
