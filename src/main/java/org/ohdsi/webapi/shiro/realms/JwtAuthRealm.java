@@ -10,6 +10,8 @@ import org.apache.shiro.subject.PrincipalCollection;
 import org.ohdsi.webapi.shiro.PermissionManager;
 import org.ohdsi.webapi.shiro.tokens.JwtAuthToken;
 
+import io.buji.pac4j.subject.Pac4jPrincipal;
+
 /**
  *
  * @author gennadiy.anisimov
@@ -30,7 +32,14 @@ public class JwtAuthRealm extends AuthorizingRealm {
 
   @Override
   protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principals) {
-    final String login = (String) principals.getPrimaryPrincipal();
+    String login;
+    Object principal = principals.getPrimaryPrincipal();
+    if (principal instanceof Pac4jPrincipal) {
+      login = ((Pac4jPrincipal)principal).getProfile().getEmail();
+    }
+    else {
+      login = (String) principals.getPrimaryPrincipal();
+    }
     return authorizer.getAuthorizationInfo(login);
   }
 

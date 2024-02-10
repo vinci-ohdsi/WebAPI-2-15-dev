@@ -7,6 +7,8 @@ import org.ohdsi.sql.SqlTranslate;
 import org.ohdsi.webapi.common.SourceMapKey;
 import org.ohdsi.webapi.service.AbstractDaoService;
 import org.ohdsi.webapi.shiro.management.datasource.SourceAccessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,6 +22,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class SourceService extends AbstractDaoService {
+
+    private final Logger logger = LoggerFactory.getLogger(SourceService.class);
 
     private static Collection<Source> cachedSources = null;
 
@@ -111,6 +115,7 @@ public class SourceService extends AbstractDaoService {
     public Source getPrioritySourceForDaimon(SourceDaimon.DaimonType daimonType) {
 
         List<Source> sourcesByDaimonPriority = sourceRepository.findAllSortedByDiamonPrioirty(daimonType);
+        logger.debug("Found {} sources for daimon type {}.", sourcesByDaimonPriority.size(), daimonType.name());
 
         for (Source source : sourcesByDaimonPriority) {
             if (!(sourceAccessor.hasAccess(source) && connectionAvailability.computeIfAbsent(source, this::checkConnectionSafe))) {
@@ -118,6 +123,7 @@ public class SourceService extends AbstractDaoService {
             }
             return source;
         }
+        logger.debug("Found NO sources that have access.");
 
         return null;
     }
@@ -127,7 +133,8 @@ public class SourceService extends AbstractDaoService {
         class SourceValidator {
             private Map<Integer, Boolean> checkedSources = new HashMap<>();
 
-            private boolean isSourceAvaialble(Source source) {
+            private boolean isSourceAvailable(Source source) {
+                logger.debug("Checking source access via isSourceAvailable...");
                 return checkedSources.computeIfAbsent(source.getSourceId(),
                         v -> sourceAccessor.hasAccess(source) && connectionAvailability.computeIfAbsent(source, SourceService.this::checkConnectionSafe));
             }
@@ -138,7 +145,8 @@ public class SourceService extends AbstractDaoService {
         Arrays.asList(SourceDaimon.DaimonType.values()).forEach(d -> {
 
             List<Source> sources = sourceRepository.findAllSortedByDiamonPrioirty(d);
-            Optional<Source> source = sources.stream().filter(sourceValidator::isSourceAvaialble)
+            logger.debug("Found {} sources.", sources.size());
+            Optional<Source> source = sources.stream().filter(sourceValidator::isSourceAvailable)
                     .findFirst();
             source.ifPresent(s -> priorityDaimons.put(d, s));
         });
@@ -167,8 +175,11 @@ public class SourceService extends AbstractDaoService {
 
         try {
             checkConnection(source);
+            logger.debug("Connection worked.");
             return true;
         } catch (CannotGetJdbcConnectionException ex) {
+            logger.debug("Connection failed: {}", ex.getMessage());
+            ex.printStackTrace();
             return false;
         }
     }

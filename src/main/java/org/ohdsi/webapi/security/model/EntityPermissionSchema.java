@@ -2,18 +2,26 @@ package org.ohdsi.webapi.security.model;
 
 import org.ohdsi.webapi.model.CommonEntity;
 import org.ohdsi.webapi.shiro.Entities.RoleEntity;
+import org.ohdsi.webapi.shiro.filters.UpdateAccessTokenFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.ohdsi.webapi.shiro.PermissionManager;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 public abstract class EntityPermissionSchema {
+    private final Logger logger = LoggerFactory.getLogger(UpdateAccessTokenFilter.class);
 
     private final EntityType entityType;
     private final Map<String, String> readPermissions;
     private final Map<String, String> writePermissions;
+
+    @Value("${security.ohdsi.custom.authorization.mode}")
+    private String authorizationMode;
 
     @Autowired
     protected PermissionManager permissionManager;
@@ -49,8 +57,12 @@ public abstract class EntityPermissionSchema {
     }
 
     public void onInsert(CommonEntity commonEntity) {
-
-        addPermissionsToCurrentUserFromTemplate(commonEntity, getAllPermissions());
+        logger.debug("AUTHORIZATION_MODE in EntityPermissionSchema == '{}'", this.authorizationMode);
+        if (this.authorizationMode.equals("teamproject")) {
+            addPermissionsToCurrentTeamProjectFromTemplate(commonEntity, getAllPermissions());
+        } else {
+            addPermissionsToCurrentUserFromTemplate(commonEntity, getAllPermissions());
+        }
     }
 
     public void onDelete(CommonEntity commonEntity) {
@@ -63,6 +75,15 @@ public abstract class EntityPermissionSchema {
 
         String login = permissionManager.getSubjectName();
         RoleEntity role = permissionManager.getUserPersonalRole(login);
+        permissionManager.addPermissionsFromTemplate(role, template, commonEntity.getId().toString());
+    }
+
+    protected void addPermissionsToCurrentTeamProjectFromTemplate(CommonEntity commonEntity, Map<String, String> template) {
+
+        RoleEntity role = permissionManager.getCurrentTeamProjectRoleForCurrentUser();
+        if (role == null) {
+            throw new RuntimeException("Expected a teamproject role but found none!");
+        }
         permissionManager.addPermissionsFromTemplate(role, template, commonEntity.getId().toString());
     }
 }
