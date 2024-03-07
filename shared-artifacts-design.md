@@ -21,3 +21,10 @@ flowchart TD;
     F -.-> G{Change is sharable};
     G -.-> H(Copied to an shared author account);
 ```
+
+### Permission states of artifacts based on the requirements
+
+| actor  | artifact type | artifact start status | change | artifact end status |
+| ------------- | ------------- | ------------- | ------------- | ------------- |
+| author  | concept set  | uncreated | created | viewable to all users |
+| author  | cohort def   | uncreated | created | viewable to all users |
