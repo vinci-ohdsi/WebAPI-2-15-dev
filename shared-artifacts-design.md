@@ -32,4 +32,6 @@ flowchart TD;
 | user  | cohort def   | viewable to users in the team in Atlas and GWAS | useful to team | viewable to users in the team in Atlas and GWAS | MVP users have 'shared reader' role for specific artifact  |
 | user  | cohort def   | viewable to users in the team in Atlas and GWAS | user copy | viewable to user's group and authors  (Atlas only) | MVP team role is assigned to the specific artifact, 'shared reader' role removed  |
 | user  | cohort def   | viewable to user's group only and authors (Atlas) | user generate | viewable to user's group only and authors (Atlas and GWAS) | MVP team role retained for generated cohort, no 'shared reader' role |
+| author  | cohort def | viewable to user's group only and authors (Atlas and GWAS) | authors decide to share to all MVP users, artifact copied into an author's account  | viewable to all users in Atlas and GWAS | MVP users have 'shared reader' role for specific artifact |
+
 
