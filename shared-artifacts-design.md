@@ -27,9 +27,9 @@ flowchart TD;
 | actor  | artifact type | artifact start status | change/decision | artifact end status |
 | ------------- | ------------- | ------------- | ------------- | ------------- |
 | author  | concept set  | uncreated | created | viewable to all users in Atlas and GWAS |
-| user  | concept set   | viewable to all users | copy | viewable to user's group |
+| user  | concept set   | viewable to all users | copy | viewable to user's group and authors|
 | author  | cohort def   | uncreated | created | viewable to all users in Atlas and GWAS |
 | user  | cohort def   | viewable to users in the team in Atlas and GWAS | useful to team | viewable to users in the team in Atlas and GWAS |
-| user  | cohort def   | viewable to users in the team in Atlas and GWAS | user copy | viewable to user's group  (Atlas only) |
-| user  | cohort def   | viewable to user's group only (Atlas) | user generate | viewable to user's group only (Atlas and GWAS) |
+| user  | cohort def   | viewable to users in the team in Atlas and GWAS | user copy | viewable to user's group and authors  (Atlas only) |
+| user  | cohort def   | viewable to user's group only and authors (Atlas) | user generate | viewable to user's group only and authors (Atlas and GWAS) |
 
