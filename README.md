@@ -80,17 +80,3 @@ It was chosen to use embedded PG instead of H2 for unit tests since H2 doesn't s
 
 ## License
 OHDSI WebAPI is licensed under Apache License 2.0
-
-## Design area
-
-```mermaid
-flowchart TD;
-    A[Atlas View shared] --> B{No change};
-    B --> |yes| C(Use existing data for GWAS);
-    B --> |no| D(Copy and edit);
-    D --> E(Generate);
-    E --> F(Use new in GWAS);
-    F -.-> G{Change is sharable};
-    G -.-> H(Copied to an shared author account);
-```
-
