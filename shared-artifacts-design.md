@@ -1,4 +1,4 @@
-```Mermaid
+```mermaid
 flowchart TD;
     A[Atlas View shared] --> B{No change};
     B --> |yes| C(Use existing data for GWAS);
