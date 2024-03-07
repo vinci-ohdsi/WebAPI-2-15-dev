@@ -24,12 +24,12 @@ flowchart TD;
 
 ### Permission states of artifacts based on the requirements
 
-| actor  | artifact type | artifact start status | change/decision | artifact end status |
-| ------------- | ------------- | ------------- | ------------- | ------------- |
-| author  | concept set  | uncreated | created | viewable to all users in Atlas and GWAS |
-| user  | concept set   | viewable to all users | copy | viewable to user's group and authors|
-| author  | cohort def   | uncreated | created | viewable to all users in Atlas and GWAS |
-| user  | cohort def   | viewable to users in the team in Atlas and GWAS | useful to team | viewable to users in the team in Atlas and GWAS |
-| user  | cohort def   | viewable to users in the team in Atlas and GWAS | user copy | viewable to user's group and authors  (Atlas only) |
-| user  | cohort def   | viewable to user's group only and authors (Atlas) | user generate | viewable to user's group only and authors (Atlas and GWAS) |
+| actor  | artifact type | artifact start status | change/decision | artifact end status | roles and WebAPI actions | 
+| ------------- | ------------- | ------------- | ------------- | ------------- | ------------- |
+| author  | concept set  | uncreated | created | viewable to all users in Atlas and GWAS | MVP users have 'shared reader' role for specific artifact |
+| user  | concept set   | viewable to all users | copy | viewable to user's group and authors| MVP team role is assigned to the specific artifact, 'shared reader' role removed |
+| author  | cohort def   | uncreated | created | viewable to all users in Atlas and GWAS | MVP users have 'shared reader' role for specific artifact  |
+| user  | cohort def   | viewable to users in the team in Atlas and GWAS | useful to team | viewable to users in the team in Atlas and GWAS | MVP users have 'shared reader' role for specific artifact  |
+| user  | cohort def   | viewable to users in the team in Atlas and GWAS | user copy | viewable to user's group and authors  (Atlas only) | MVP team role is assigned to the specific artifact, 'shared reader' role removed  |
+| user  | cohort def   | viewable to user's group only and authors (Atlas) | user generate | viewable to user's group only and authors (Atlas and GWAS) | MVP team role retained for generated cohort, no 'shared reader' role |
 
