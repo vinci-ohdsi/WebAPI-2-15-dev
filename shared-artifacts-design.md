@@ -10,6 +10,10 @@
 
 - When users copy an artifact and change it as described above, the authoring team will see that this has happened in their regular reports. The authoring team may review and copy the artifact (as with any artifact) and decide to make the copy sharable to all MVP users. 
 
+- We need to find a way to make sure that a user with 'read restricted Atlas Users' role do not ever get assigned a role with '*' permission (e.g., conceptset:*:get or cohortdefinition:*:get) b.c. this would perpetuate so that they would have access to artifacts across the system.
+    - This might be implemented as a DB constraint (if possible as 'CHECK' restraint?) in postgres which is the only DBMS used for security
+        - or, could be implemented as a trigger in the Java model code
+    - Note that the Atlas admin manage permissions interface should ensure that 'read restricted Atlas Users' do not get assigned roles with '*' permissions. 
 
 ```mermaid
 flowchart TD;
