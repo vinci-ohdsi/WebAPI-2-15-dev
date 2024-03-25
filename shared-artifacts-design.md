@@ -27,8 +27,10 @@
 | author  | authoring team role  | read all artifacts from all users, read/write owned artifacts, share owned artifacts |
 | non-author  | regular team role  | read/write owned artifacts, read artifacts shared globally |
 
-- When an author user changes from an authoring team to a non-authoring team, the system will ensure that the authoring role, which includes the permission that triggers Atlas to enable the 'share' feature and a permission that allows them to see other teams' artifacts, is removed.
-    - 'read restricted Atlas Users' role do not ever get assigned a role with '*' permission (e.g., conceptset:*:get or cohortdefinition:*:get) b.c. this would perpetuate so that they would have access to artifacts across the system.
+- When an author user changes from an authoring team to a non-authoring team, the system will ensure that the authoring role, which includes the permission that triggers Atlas to enable the 'share' feature and a permission that allows them to see other teams' artifacts, is not present.
+- The authoring role is a non-system role that has the permissions needed to share. Non-authors just do not get that role.
+    - The system enforces that no user has both a non-authoring role and authoring role 
+    - 'read restricted Atlas Users' role do not ever get assigned a role with 'star' permission (e.g., conceptset:*:get or cohortdefinition:*:get) b.c. this would perpetuate so that they would have access to artifacts across the system.
     - This might be implemented as a DB constraint (if possible as 'TRIGGER' restraint?) in postgres, which is the only DBMS used for security
         - or, could be implemented as a trigger in the Java model code
     - Note that the Atlas admin manage permissions interface should ensure that 'read restricted Atlas Users' do not get assigned roles with '*' permissions. 
