@@ -37,7 +37,7 @@
 | artifact  | state | permissions | 
 | ------------- | ------------- | ------------- | 
 | concept set | shared | all users with the regular team role have GET permissions to the concept set |
-| concept set | not shared | the creator and the creator's team have read/write permissions to the concept set and can generate it |
+| concept set | not shared | the creator and the creator's team have read/write permissions to the concept set |
 | cohort definition | shared | all users with the regular team role have GET permissions to the cohort definition, no ability to generate the cohort |
 | cohort definition | not shared | the creator and the creator's team read/write permissions to the cohort definition and can generate it |
 
