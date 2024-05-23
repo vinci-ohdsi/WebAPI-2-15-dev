@@ -124,8 +124,18 @@ public class PermissionService {
             .getReturnType();
         CommonEntity entity = (CommonEntity) entityRepository.getOne((Serializable) conversionService.convert(entityId, idClazz));
 
-        if (!isCurrentUserOwnerOf(entity)) {
-            throw new UnauthorizedException();
+        if (this.authorizationMode.equals("teamproject")) {
+            // in teamproject mode, it is sufficient if the user has write permission to this entity,
+            // as entity ownership and maintenance is a shared responsibility within a team:
+            boolean hasAccess = hasWriteAccess(entity);
+            if (!hasAccess) {
+                throw new UnauthorizedException();
+            }
+        } else {
+            // default validation: current **user** should be owner:
+            if (!isCurrentUserOwnerOf(entity)) {
+                throw new UnauthorizedException();
+            }
         }
     }
 
