@@ -1,4 +1,4 @@
-FROM maven:3.6-jdk-11 as builder
+FROM quay.io/cdis/maven:3.6-jdk-11 as builder
 
 WORKDIR /code
 
