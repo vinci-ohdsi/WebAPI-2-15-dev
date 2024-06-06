@@ -20,13 +20,15 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.authz.UnauthorizedException;
+import org.apache.shiro.authz.permission.WildcardPermission;
+import org.apache.shiro.subject.Subject;
 
 /**
  * REST Services related to working with security permissions
@@ -159,7 +161,16 @@ public class PermissionController {
             AccessRequestDTO accessRequestDTO
     ) throws Exception {
 
+        // check if user, or his "teamProject" own the entity being given access:
         permissionService.checkCommonEntityOwnership(entityType, entityId);
+        // furthermore, check if the entity is being shared with "public" role (roleId==1). If yes, then
+        // check if user has the necessary global/public sharing permission ("artifact:global:share:put") to do so:
+        if (roleId == RoleEntity.PUBLIC_ROLE_ID) {
+            Subject subject = SecurityUtils.getSubject();
+            if (!subject.isPermitted(new WildcardPermission("artifact:global:share:put"))) {
+                throw new UnauthorizedException();
+            }
+        }
 
         Map<String, String> permissionTemplates = permissionService.getTemplatesForType(entityType, accessRequestDTO.getAccessType());
 

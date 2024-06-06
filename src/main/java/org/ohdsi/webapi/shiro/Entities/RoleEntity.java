@@ -23,6 +23,7 @@ import org.hibernate.annotations.Parameter;
 public class RoleEntity implements Serializable{
 
   private static final long serialVersionUID = 6257846375334314942L;
+  public static final int PUBLIC_ROLE_ID = 1;
 
   @Id
   @Column(name = "ID")
