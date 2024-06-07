@@ -125,10 +125,13 @@ public class PermissionService {
         CommonEntity entity = (CommonEntity) entityRepository.getOne((Serializable) conversionService.convert(entityId, idClazz));
 
         if (this.authorizationMode.equals("teamproject")) {
-            // in teamproject mode, it is sufficient if the user has write permission to this entity,
+            // in teamproject mode, it is sufficient if the team has ALL write permission to this entity,
             // as entity ownership and maintenance is a shared responsibility within a team:
-            boolean hasAccess = hasWriteAccess(entity);
-            if (!hasAccess) {
+            RoleEntity teamProjectRole = this.permissionManager.getCurrentTeamProjectRoleForCurrentUser();
+            boolean teamHasWriteAccess = roleHasAccess(teamProjectRole, entity, AccessType.WRITE);
+            if (!teamHasWriteAccess) {
+                logger.error("Permission denied: teamProject {} does not have write access to the entity {}",
+                    teamProjectRole.getName(), entity.getId());
                 throw new UnauthorizedException();
             }
         } else {
@@ -212,6 +215,21 @@ public class PermissionService {
                 }
             } catch (Exception e) {
                 logger.error("Error getting user roles and permissions", e);
+                throw new RuntimeException(e);
+            }
+        }
+        return hasAccess;
+    }
+
+    public boolean roleHasAccess(RoleEntity role, CommonEntity entity, AccessType accessType) {
+        boolean hasAccess = false;
+        if (securityEnabled) {
+            try {
+                EntityType entityType = entityPermissionSchemaResolver.getEntityType(entity.getClass());
+                List<Permission> permsToCheck = getEntityPermissions(entityType, entity.getId(), accessType);
+                hasAccess = permsToCheck.stream().allMatch(p -> role.isPermitted(p));
+            } catch (Exception e) {
+                logger.error("Error getting and verifying role's permissions", e);
                 throw new RuntimeException(e);
             }
         }

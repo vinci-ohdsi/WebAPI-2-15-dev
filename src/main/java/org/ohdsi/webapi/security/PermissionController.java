@@ -6,6 +6,8 @@ import org.ohdsi.webapi.security.model.EntityType;
 import org.ohdsi.webapi.service.UserService;
 import org.ohdsi.webapi.shiro.Entities.PermissionEntity;
 import org.ohdsi.webapi.shiro.Entities.RoleEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.ohdsi.webapi.shiro.PermissionManager;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.stereotype.Controller;
@@ -39,6 +41,7 @@ import org.apache.shiro.subject.Subject;
 @Path(value = "/permission")
 @Transactional
 public class PermissionController {
+    private final Logger logger = LoggerFactory.getLogger(PermissionController.class);
 
     private final PermissionService permissionService;
     private final PermissionManager permissionManager;
@@ -163,11 +166,13 @@ public class PermissionController {
 
         // check if user, or his "teamProject" own the entity being given access:
         permissionService.checkCommonEntityOwnership(entityType, entityId);
-        // furthermore, check if the entity is being shared with "public" role (roleId==1). If yes, then
+        // furthermore, check if the entity is being shared to the "public" role (roleId==1). If yes, then
         // check if user has the necessary global/public sharing permission ("artifact:global:share:put") to do so:
         if (roleId == RoleEntity.PUBLIC_ROLE_ID) {
             Subject subject = SecurityUtils.getSubject();
             if (!subject.isPermitted(new WildcardPermission("artifact:global:share:put"))) {
+                logger.error("Permission denied: user {} has no permission for sharing entities globally (making them visible to all with a 'public' role)",
+                    this.permissionManager.getSubjectName());
                 throw new UnauthorizedException();
             }
         }

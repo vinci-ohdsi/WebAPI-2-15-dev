@@ -11,6 +11,8 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
+import org.apache.shiro.authz.permission.WildcardPermission;
+import org.apache.shiro.authz.Permission;
 import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Parameter;
 
@@ -89,5 +91,16 @@ public class RoleEntity implements Serializable{
 
   public void setSystemRole(Boolean system) {
     systemRole = system;
+  }
+
+  public boolean isPermitted(Permission p) {
+    for (RolePermissionEntity rolePermissionEntity : this.getRolePermissions()) {
+        PermissionEntity permissionEntity = rolePermissionEntity.getPermission();
+        WildcardPermission rolePermission = new WildcardPermission(permissionEntity.getValue());
+        if (rolePermission.implies(p)) {
+            return true;
+        }
+    }
+    return false;
   }
 }
