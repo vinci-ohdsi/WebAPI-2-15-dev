@@ -11,6 +11,7 @@ public class FilterChainBuilder {
     private String restFilters;
     private String authcFilter;
     private String authzFilter;
+    private String teamProjectAuthzFilter;
     private String filtersBeforeOAuth;
     private String filtersAfterOAuth;
 
@@ -39,6 +40,12 @@ public class FilterChainBuilder {
         return this;
     }
 
+    public FilterChainBuilder setTeamProjectAuthzFilter(FilterTemplates... authzFilters) {
+        this.teamProjectAuthzFilter = convertArrayToString(authzFilters);
+        return this;
+    }
+    
+
     public FilterChainBuilder addRestPath(String path, String filters) {
         return this.addPath(path, this.restFilters + ", " + filters);
     }
@@ -56,13 +63,13 @@ public class FilterChainBuilder {
     }
 
     public FilterChainBuilder addProtectedRestPath(String path) {
-        return this.addRestPath(path, this.authcFilter + ", " + this.authzFilter);
+        return this.addRestPath(path, this.authcFilter + ", " + this.authzFilter + ", " + this.teamProjectAuthzFilter);
     }
 
     public FilterChainBuilder addProtectedRestPath(String path, FilterTemplates... filters) {
 
         String filtersStr = convertArrayToString(filters);
-        return this.addRestPath(path, authcFilter + ", " + authzFilter + ", " + filtersStr);
+        return this.addRestPath(path, authcFilter + ", " + authzFilter + ", " + this.teamProjectAuthzFilter + ", " + filtersStr);
     }
 
     public FilterChainBuilder addPath(String path, FilterTemplates... filters) {

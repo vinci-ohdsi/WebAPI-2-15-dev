@@ -62,6 +62,9 @@ public class PermissionService {
     @Value("#{!'${security.provider}'.equals('DisabledSecurity')}")
     private boolean securityEnabled;
 
+    @Value("${security.ohdsi.custom.authorization.mode}")
+    private String authorizationMode;
+
     private final EntityGraph PERMISSION_ENTITY_GRAPH = EntityGraphUtils.fromAttributePaths("rolePermissions", "rolePermissions.role");
 
     public PermissionService(
@@ -121,8 +124,21 @@ public class PermissionService {
             .getReturnType();
         CommonEntity entity = (CommonEntity) entityRepository.getOne((Serializable) conversionService.convert(entityId, idClazz));
 
-        if (!isCurrentUserOwnerOf(entity)) {
-            throw new UnauthorizedException();
+        if (this.authorizationMode.equals("teamproject")) {
+            // in teamproject mode, it is sufficient if the team has ALL write permission to this entity,
+            // as entity ownership and maintenance is a shared responsibility within a team:
+            RoleEntity teamProjectRole = this.permissionManager.getCurrentTeamProjectRoleForCurrentUser();
+            boolean teamHasWriteAccess = roleHasAccess(teamProjectRole, entity, AccessType.WRITE);
+            if (!teamHasWriteAccess) {
+                logger.error("Permission denied: teamProject {} does not have write access to the entity {}",
+                    teamProjectRole.getName(), entity.getId());
+                throw new UnauthorizedException();
+            }
+        } else {
+            // default validation: current **user** should be owner:
+            if (!isCurrentUserOwnerOf(entity)) {
+                throw new UnauthorizedException();
+            }
         }
     }
 
@@ -189,7 +205,8 @@ public class PermissionService {
                 Subject subject = SecurityUtils.getSubject();
                 String login = this.permissionManager.getSubjectName();
                 UserSimpleAuthorizationInfo authorizationInfo = this.permissionManager.getAuthorizationInfo(login);
-                if (Objects.equals(authorizationInfo.getUserId(), entity.getCreatedBy().getId())) {
+                if (!this.authorizationMode.equals("teamproject") &&
+                Objects.equals(authorizationInfo.getUserId(), entity.getCreatedBy().getId())) {
                     hasAccess = true; // the role is the one that created the artifact
                 } else {
                     EntityType entityType = entityPermissionSchemaResolver.getEntityType(entity.getClass());
@@ -198,6 +215,21 @@ public class PermissionService {
                 }
             } catch (Exception e) {
                 logger.error("Error getting user roles and permissions", e);
+                throw new RuntimeException(e);
+            }
+        }
+        return hasAccess;
+    }
+
+    public boolean roleHasAccess(RoleEntity role, CommonEntity entity, AccessType accessType) {
+        boolean hasAccess = false;
+        if (securityEnabled) {
+            try {
+                EntityType entityType = entityPermissionSchemaResolver.getEntityType(entity.getClass());
+                List<Permission> permsToCheck = getEntityPermissions(entityType, entity.getId(), accessType);
+                hasAccess = permsToCheck.stream().allMatch(p -> role.isPermitted(p));
+            } catch (Exception e) {
+                logger.error("Error getting and verifying role's permissions", e);
                 throw new RuntimeException(e);
             }
         }
